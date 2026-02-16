@@ -1,50 +1,49 @@
 module.exports = {
-	config: {
-		name: "checkwarn",
-		version: "1.3",
-		author: "NTKhang",
-		category: "events"
-	},
+  config: {
+    name: "checkwarn",
+    version: "2.0",
+    author: "SHALLOCK",
+    category: "events"
+  },
 
-	langs: {
-		vi: {
-			warn: "Thành viên %1 đã bị cảnh cáo đủ 3 lần trước đó và bị ban khỏi box chat\n- Name: %1\n- Uid: %2\n- Để gỡ ban vui lòng sử dụng lệnh \"%3warn unban <uid>\" (với uid là uid của người muốn gỡ ban)",
-			needPermission: "Bot cần quyền quản trị viên để kick thành viên bị ban"
-		},
-		en: {
-			warn: "Member %1 has been warned 3 times before and has been banned from the chat box\n- Name: %1\n- Uid: %2\n- To unban, please use the \"%3warn unban <uid>\" command (with uid is the uid of the person you want to unban)",
-			needPermission: "Bot needs administrator permission to kick banned members"
-		}
-	},
+  langs: {
+    en: {
+      warn: "🛑 𝗔𝗟𝗘𝗥𝗧: 𝗕𝗔𝗡𝗡𝗘𝗗 𝗠𝗘𝗠𝗕𝗘𝗥 𝗗𝗘𝗧𝗘𝗖𝗧𝗘𝗗!\n━━━━━━━━━━━━━━━━━━━\n👤 নাম: %1\n🆔 আইডি: %2\n⚠️ অপরাধ: ইতিপূর্বে ৩ বার ওয়ার্নিং খেয়েছেন।\n🚫 অবস্থা: এই গ্রুপে আপনার প্রবেশ নিষিদ্ধ!\n━━━━━━━━━━━━━━━━━━━\n🛠 আনব্যান করতে ওনারকে বলুন।\n👑 𝗕𝗼𝘁 𝗢𝘄𝗻𝗲𝗿 : SHALLOCK",
+      needPermission: "⚠️ আমাকে গ্রুপের এডমিন বানান, নয়তো আমি এই অপরাধীকে বের করতে পারবো না!"
+    }
+  },
 
-	onStart: async ({ threadsData, message, event, api, client, getLang }) => {
-		if (event.logMessageType == "log:subscribe")
-			return async function () {
-				const { threadID } = event;
-				const { data } = await threadsData.get(event.threadID);
-				const { warn: warnList } = data;
-				if (!warnList)
-					return;
-				const { addedParticipants } = event.logMessageData;
-				for (const user of addedParticipants) {
-					const findUser = warnList.find(user => user.userID == user.userID);
-					if (findUser && findUser.list >= 3) {
-						const userName = user.fullName;
-						const uid = user.userFbId;
-						message.send({
-							body: getLang("warn", userName, uid, client.getPrefix(threadID)),
-							mentions: [{
-								tag: userName,
-								id: uid
-							}]
-						}, function () {
-							api.removeUserFromGroup(uid, threadID, (err) => {
-								if (err)
-									return message.send(getLang("needPermission"));
-							});
-						});
-					}
-				}
-			};
-	}
+  onStart: async ({ threadsData, message, event, api, globalData, getLang }) => {
+    if (event.logMessageType == "log:subscribe") {
+      const { threadID } = event;
+      const threadData = await threadsData.get(threadID);
+      const { data } = threadData;
+      
+      // ওয়ার্নিং লিস্ট চেক
+      const warnList = data.warn || [];
+      const { addedParticipants } = event.logMessageData;
+
+      for (const user of addedParticipants) {
+        const userID = user.userFbId;
+        const userName = user.fullName;
+
+        // ইউজারের ওয়ার্নিং কাউন্ট দেখা
+        const findUser = warnList.find(i => i.userID == userID);
+
+        if (findUser && findUser.list.length >= 3) {
+          const form = {
+            body: getLang("warn", userName, userID),
+            mentions: [{ tag: userName, id: userID }]
+          };
+
+          // মেসেজ পাঠিয়ে কিক মারা
+          return message.send(form, () => {
+            api.removeUserFromGroup(userID, threadID, (err) => {
+              if (err) return message.send(getLang("needPermission"));
+            });
+          });
+        }
+      }
+    }
+  }
 };
