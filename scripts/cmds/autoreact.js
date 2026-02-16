@@ -1,12 +1,12 @@
 module.exports = {
   config: {
     name: "autoreact",
-    version: "4.4.0",
-    author: "MOHAMMAD AKASH",
+    version: "5.0.0",
+    author: "SHALLOCK",
     role: 0,
     category: "system",
-    shortDescription: "Auto react (emoji + text)",
-    longDescription: "Stable auto reaction without silent API fail"
+    shortDescription: "মেসেজের মুড বুঝে অটো রিয়েক্ট দিবে",
+    longDescription: "এটি মেসেজ থেকে ইমোজি এবং টেক্সট কিউয়োর্ড ডিটেক্ট করে সঠিক রিয়েক্ট দেয়।"
   },
 
   onStart: async function () {},
@@ -14,80 +14,47 @@ module.exports = {
   onChat: async function ({ api, event }) {
     try {
       const { messageID, body, senderID, threadID } = event;
-      if (!messageID || !body) return;
+      if (!messageID || !body || senderID === api.getCurrentUserID()) return;
 
-      // ❌ নিজের / বটের মেসেজে রিয়েক্ট না
-      if (senderID === api.getCurrentUserID()) return;
-
-      // ❌ হালকা cooldown (2.5s)
+      // 🛑 কুলডাউন প্রোটেকশন (যাতে বট পাগল না হয়ে যায়)
       global.__autoReactCooldown ??= {};
-      if (
-        global.__autoReactCooldown[threadID] &&
-        Date.now() - global.__autoReactCooldown[threadID] < 2500
-      ) return;
-
+      if (global.__autoReactCooldown[threadID] && Date.now() - global.__autoReactCooldown[threadID] < 2000) return;
       global.__autoReactCooldown[threadID] = Date.now();
 
       const text = body.toLowerCase();
       let react = null;
 
-      // ==========================
-      // Emoji Categories
-      // ==========================
-      const categories = [
-        { e: ["😂","🤣","😆","😄","😁"], r: "😆" },
-        { e: ["😭","😢","🥺","💔"], r: "😢" },
-        { e: ["❤️","💖","💘","🥰","😍"], r: "❤️" },
-        { e: ["😡","🤬"], r: "😡" },
-        { e: ["😮","😱","😲"], r: "😮" },
-        { e: ["😎","🔥","💯"], r: "😎" },
-        { e: ["👍","👌","🙏"], r: "👍" },
-        { e: ["🎉","🥳"], r: "🎉" }
+      // 🧠 অ্যাডভ্যান্স কিউয়োর্ড ও রিয়েক্ট ম্যাপিং
+      const triggers = [
+        { keys: ["😂", "🤣", "হাসি", "haha", "lol", "xd", "হাসলি", "moja"], r: "😆" },
+        { keys: ["😭", "😢", "🥺", "sad", "কান্না", "মন খারাপ", "cry", "ব্যথা"], r: "😢" },
+        { keys: ["❤️", "🥰", "😍", "love", "ভালোবাসি", "ভালবাসি", "বাবু", "miss"], r: "❤️" },
+        { keys: ["😡", "🤬", "রাগ", "angry", "কুত্তা", "শুয়োর", "শালা"], r: "😡" },
+        { keys: ["😮", "😱", "wow", "omg", "অবাক", "কি?", "ki?"], r: "😮" },
+        { keys: ["👍", "ok", "ঠিক", "হুম", "hmm", "okay", "yes"], r: "👍" },
+        { keys: ["🔥", "💯", "সেরা", "best", "আগুন", "op", "nice"], r: "😎" },
+        { keys: ["🎉", "🥳", "congrats", "অভিনন্দন", "বিয়া", "বিয়ে"], r: "🎉" }
       ];
 
-      // ==========================
-      // Text Triggers
-      // ==========================
-      const texts = [
-        { k: ["haha","lol","moja","xd"], r: "😆" },
-        { k: ["sad","kharap","mon kharap","cry"], r: "😢" },
-        { k: ["love","valobasi","miss"], r: "❤️" },
-        { k: ["rag","angry","rage"], r: "😡" },
-        { k: ["wow","omg"], r: "😮" },
-        { k: ["ok","yes","okay","hmm"], r: "👍" }
-      ];
-
-      // ==========================
-      // Emoji check first
-      // ==========================
-      for (const c of categories) {
-        if (c.e.some(x => text.includes(x))) {
-          react = c.r;
+      // লুপ চালিয়ে চেক করা
+      for (const item of triggers) {
+        if (item.keys.some(k => text.includes(k))) {
+          react = item.r;
           break;
         }
       }
 
-      // ==========================
-      // Text check
-      // ==========================
-      if (!react) {
-        for (const t of texts) {
-          if (t.k.some(x => text.includes(x))) {
-            react = t.r;
-            break;
-          }
-        }
-      }
-
-      // ❌ কিছু না মিললে রিয়েক্ট না
       if (!react) return;
 
-      // ⏱ Human-like delay
-      await new Promise(r => setTimeout(r, 800));
+      // 🕒 হিউম্যান-লাইক ডিলে (বট যে ভাবছে তা বোঝানোর জন্য)
+      const delay = Math.floor(Math.random() * (1500 - 800 + 1)) + 800;
+      await new Promise(res => setTimeout(res, delay));
 
-      // ✅ FINAL FIX — NO callback, NO true
-      api.setMessageReaction(react, messageID);
+      // ✅ রিয়েক্ট সেন্ড
+      api.setMessageReaction(react, messageID, () => {}, true);
 
-    } catch (e) {}
+    } catch (err) {
+      // সাইলেন্ট এরর হ্যান্ডলিং
+    }
   }
 };
