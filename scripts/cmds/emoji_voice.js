@@ -5,23 +5,51 @@ const path = require("path");
 module.exports = {
   config: {
     name: "emoji_voice",
-    version: "2.0.2",
-    author: "MOHAMMAD AKASH",
+    version: "3.0.0",
+    author: "SHALLOCK",
     countDown: 5,
     role: 0,
-    shortDescription: "Sends a cute girl's voice when an emoji is used 😍",
-longDescription: "One emoji triggers multiple voices, sent randomly 😘",
-    category: "system"
+    category: "system",
+    shortDescription: "ইমোজিতে ভয়েস এবং গালি দিলে কিক!",
+    longDescription: "ইমোজি দিলে অডিও পাঠাবে এবং গালি দিলে সাথে সাথে কিক মারবে।"
   },
 
   onStart: async function () {},
 
-  onChat: async function ({ event, message }) {
-    const { body } = event;
-    if (!body || body.length > 2) return;
+  onChat: async function ({ event, message, api, threadsData }) {
+    const { body, senderID, threadID, messageID } = event;
+    if (!body || senderID === api.getCurrentUserID()) return;
 
-    // --- EMOJI WITH MULTIPLE RANDOM AUDIO LINKS ---
-    const emojiAudioMap = {
+    // ==========================================
+    // ১. গালি প্রোটেকশন সিস্টেম (Direct Kick)
+    // ==========================================
+    const badWords = ["চুতিয়া", "কুত্তা", "শুয়োর", "শালা", "হারামি", "মাদারচুদ", "খানকি", "বাল", "চুদি"];
+    const text = body.toLowerCase();
+    
+    if (badWords.some(word => text.includes(word))) {
+      try {
+        // মেসেজ ডিলিট
+        api.unsendMessage(messageID);
+        
+        // কিক মেসেজ
+        await message.send({
+          body: `🚫 𝗗𝗶𝗿𝗲𝗰𝘁 𝗞𝗶𝗰𝗸!\n━━━━━━━━━━━━━━━━━━\nঐ বেয়াদব! মুখে লাগাম নাই? ওনারকে বা গ্রুপে গালি দেওয়ার সাহস কই পাস? \n\n👤 অপরাধী: @${senderID}\n❌ অপরাধ: গালিগালাজ\n🔨 শাস্তি: চিরস্থায়ী বহিষ্কার!\n━━━━━━━━━━━━━━━━━━\n👑 𝗣𝗿𝗼𝘁𝗲𝗰𝘁𝗲𝗱 𝗯𝘆: SHALLOCK`,
+          mentions: [{ tag: senderID, id: senderID }]
+        });
+
+        // কিক মারা
+        return api.removeUserFromGroup(senderID, threadID);
+      } catch (err) {
+        return message.reply("⚠️ এই আবালরে কিক মারতে পারছি না, আমাকে এডমিন দাও!");
+      }
+    }
+
+    // ==========================================
+    // ২. ইমোজি ভয়েস সিস্টেম
+    // ==========================================
+    if (body.length > 2) return;
+
+    const emojiAudioMap =  {
       "🥱": ["https://files.catbox.moe/9pou40.mp3","https://files.catbox.moe/60cwcg.mp3"],
       "😁": ["https://files.catbox.moe/60cwcg.mp3"],
       "😌": ["https://files.catbox.moe/epqwbx.mp3"],
@@ -67,37 +95,26 @@ longDescription: "One emoji triggers multiple voices, sent randomly 😘",
       "🤧": ["https://files.catbox.moe/zh3mdg.mp3"],
       "🙄": ["https://files.catbox.moe/vgzkeu.mp3"]
 
-    };
+    } ;
 
     const emoji = body.trim();
     const audioList = emojiAudioMap[emoji];
     if (!audioList) return;
 
-    // --- RANDOM AUDIO SELECT ---
     const audioUrl = audioList[Math.floor(Math.random() * audioList.length)];
-
     const cacheDir = path.join(__dirname, "cache");
     fs.ensureDirSync(cacheDir);
 
-    // 🔥 UNIQUE FILE NAME EVERY TIME TO AVOID REPEAT
-    const filePath = path.join(
-      cacheDir,
-      `${encodeURIComponent(emoji)}_${Date.now()}_${Math.floor(Math.random() * 1000)}.mp3`
-    );
+    const filePath = path.join(cacheDir, `${Date.now()}.mp3`);
 
     try {
       const response = await axios.get(audioUrl, { responseType: "arraybuffer" });
       fs.writeFileSync(filePath, Buffer.from(response.data));
 
-      // 🔥 REPLY WITH FRESH STREAM
       await message.reply({ attachment: fs.createReadStream(filePath) });
-
-      fs.unlink(filePath, (err) => {
-        if (err) console.error("Failed to delete cache file:", err);
-      });
+      fs.unlinkSync(filePath);
     } catch (error) {
       console.error(error);
-      message.reply("ইমোজি দিয়ে লাভ নাই 😒\nযাও মুড়ি খাও জান 😘");
     }
   }
 };
